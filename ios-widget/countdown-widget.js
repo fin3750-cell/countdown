@@ -54,7 +54,7 @@
 // the web app pointed at the same real moment.
 const TARGET = new Date(Date.UTC(2026, 11, 17, 21, 44, 0, 0));
 
-const TITLE = 'Countdown';
+const TITLE = 'Elder Wells';
 const APP_URL = 'https://fin3750-cell.github.io/countdown/';
 
 // ------------------------------------------------------------------

@@ -101,13 +101,15 @@ body::after {
   max-width: 44rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  /* Tight: every pixel saved between the panels pushes the whole block
+     further down the frame and uncovers more of the photo. */
+  gap: clamp(.6rem, 2.5vw, 1rem);
   /* Push the content into the lower, darker half of the frame so it never
      sits across the face. The height comes from body stretching this to
      full viewport height, rather than a min-height here, which would add
      to the body padding and create a spurious scrollbar. */
   justify-content: flex-end;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0;
 }
 
 /* ---------------- header ---------------- */
@@ -322,7 +324,17 @@ summary:focus-visible,
   justify-content: center;
   gap: .5rem;
   flex-wrap: wrap;
-  min-height: 1.5rem;
+  /* No reserved height. This used to hold 1.5rem open permanently to stop
+     the layout jumping when a badge appeared, but both badges are hidden
+     almost all the time, so it was blocking part of the photo for nothing. */
+  min-height: 0;
+}
+
+/* Drop the row out of the layout entirely when no badge is showing, so it
+   does not consume one of the flex gaps either. Engines without :has()
+   simply keep that single gap - a few pixels, not a broken layout. */
+.foot:not(:has(.badge:not([hidden]))) {
+  display: none;
 }
 
 .badge {

@@ -66,7 +66,7 @@
 
 // 17 December 2026, 2:44 PM MST = 21:44 UTC. Same instant as the web app.
 const TARGET = new Date(Date.UTC(2026, 11, 17, 21, 44, 0, 0));
-const TITLE = 'COUNTDOWN';
+const TITLE = 'ELDER WELLS';
 
 // Vertical placement, as a fraction of screen height.
 //
