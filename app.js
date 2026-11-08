@@ -41,6 +41,28 @@
   // app remembers rather than something this default overrides on reload.
   var DEFAULT_TITLE = 'Elder Wells';
 
+  // Background photo storage.
+  //
+  // The photo lives in IndexedDB, not localStorage. localStorage only holds
+  // strings, so an image would have to be base64-encoded - which inflates it
+  // by about a third and then has to fit a quota of roughly 5MB for the
+  // whole origin. IndexedDB stores the Blob as binary, with a far larger
+  // quota, and hands it straight back on load.
+  var DB_NAME = 'countdown';
+  var DB_VERSION = 1;
+  var STORE_MEDIA = 'media';
+  var KEY_BG = 'background';
+
+  var KEY_BG_POS = 'countdown.bgpos.v1';  // value: "0".."100"
+  var DEFAULT_BG_POS = 18;
+
+  // Incoming photos are re-encoded down to this before being stored. A
+  // modern phone camera produces 3000px+ images of several megabytes; a
+  // full-screen background needs nothing like that, and storing the
+  // original would waste space and slow every load.
+  var MAX_PHOTO_DIM = 1400;
+  var PHOTO_QUALITY = 0.82;
+
   // ---------------------------------------------------------------
   // Element references
   // ---------------------------------------------------------------
@@ -62,6 +84,10 @@
     tzHint:      document.getElementById('tz-hint'),
     error:       document.getElementById('error'),
     resetBtn:    document.getElementById('reset'),
+    photoInput:  document.getElementById('photo-input'),
+    photoHint:   document.getElementById('photo-hint'),
+    photoReset:  document.getElementById('photo-reset'),
+    posInput:    document.getElementById('pos-input'),
     offline:     document.getElementById('offline-badge'),
     update:      document.getElementById('update-badge'),
     reloadBtn:   document.getElementById('reload-btn'),
@@ -75,6 +101,7 @@
   var targetDate = null;       // a Date object: the fixed instant we count to
   var timerId = null;          // handle for the pending setTimeout
   var lastAnnouncement = null; // last text written to the live region
+  var currentPhotoUrl = null;  // object URL for a custom background, if any
 
   // ---------------------------------------------------------------
   // localStorage helpers
@@ -105,6 +132,160 @@
     try {
       window.localStorage.removeItem(key);
     } catch (err) { /* ignore */ }
+  }
+
+  // ---------------------------------------------------------------
+  // Background photo: IndexedDB
+  //
+  // Every call is wrapped and resolves rather than rejecting on failure.
+  // IndexedDB can be entirely unavailable in private browsing or when site
+  // data is blocked, and a custom background is a nicety - its absence must
+  // never stop the countdown from running.
+  // ---------------------------------------------------------------
+
+  function idbOpen() {
+    return new Promise(function (resolve) {
+      var request;
+      try {
+        request = window.indexedDB.open(DB_NAME, DB_VERSION);
+      } catch (err) {
+        resolve(null);
+        return;
+      }
+      request.onupgradeneeded = function () {
+        var db = request.result;
+        if (!db.objectStoreNames.contains(STORE_MEDIA)) {
+          db.createObjectStore(STORE_MEDIA);
+        }
+      };
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { resolve(null); };
+      request.onblocked = function () { resolve(null); };
+    });
+  }
+
+  function idbRun(mode, operation) {
+    return idbOpen().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (resolve) {
+        var tx, store, request;
+        try {
+          tx = db.transaction(STORE_MEDIA, mode);
+          store = tx.objectStore(STORE_MEDIA);
+          request = operation(store);
+        } catch (err) {
+          resolve(null);
+          return;
+        }
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { resolve(null); };
+        tx.oncomplete = function () { db.close(); };
+      });
+    }).catch(function () { return null; });
+  }
+
+  function loadStoredPhoto() {
+    return idbRun('readonly', function (store) { return store.get(KEY_BG); });
+  }
+
+  function saveStoredPhoto(blob) {
+    return idbRun('readwrite', function (store) { return store.put(blob, KEY_BG); });
+  }
+
+  function clearStoredPhoto() {
+    return idbRun('readwrite', function (store) { return store.delete(KEY_BG); });
+  }
+
+  // ---------------------------------------------------------------
+  // Background photo: decoding, resizing and applying
+  // ---------------------------------------------------------------
+
+  /**
+   * Re-encode a chosen file down to a sane size as a JPEG Blob.
+   *
+   * Going through a canvas does two useful things beyond shrinking it.
+   * It normalises the format: an iPhone may hand over a HEIC file, which
+   * Safari can decode but which other browsers cannot, and the canvas
+   * re-encode turns it into a JPEG everything understands. It also strips
+   * EXIF metadata, including any GPS coordinates the photo was carrying.
+   */
+  function preparePhoto(file) {
+    return new Promise(function (resolve, reject) {
+      var objectUrl = URL.createObjectURL(file);
+      var img = new Image();
+
+      img.onload = function () {
+        URL.revokeObjectURL(objectUrl);
+
+        var w = img.naturalWidth;
+        var h = img.naturalHeight;
+        if (!w || !h) {
+          reject(new Error('That image could not be read.'));
+          return;
+        }
+
+        var scale = Math.min(1, MAX_PHOTO_DIM / Math.max(w, h));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+
+        try {
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        } catch (err) {
+          reject(new Error('That image could not be processed.'));
+          return;
+        }
+
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob);
+          else reject(new Error('That image could not be converted.'));
+        }, 'image/jpeg', PHOTO_QUALITY);
+      };
+
+      img.onerror = function () {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('That file is not an image this browser can open.'));
+      };
+
+      img.src = objectUrl;
+    });
+  }
+
+  /**
+   * Point the background layer at a Blob, or back at the shipped photo.
+   *
+   * The object URL is revoked before a new one replaces it; without that,
+   * each photo change would leak its predecessor for the life of the page.
+   */
+  function applyPhoto(blob) {
+    if (currentPhotoUrl) {
+      URL.revokeObjectURL(currentPhotoUrl);
+      currentPhotoUrl = null;
+    }
+    if (blob) {
+      currentPhotoUrl = URL.createObjectURL(blob);
+      document.documentElement.style.setProperty(
+        '--bg-image', 'url("' + currentPhotoUrl + '")');
+    } else {
+      // Removing the property lets the CSS fallback - the shipped photo -
+      // take over again.
+      document.documentElement.style.removeProperty('--bg-image');
+    }
+  }
+
+  function applyPhotoPosition(percent) {
+    var n = Number(percent);
+    if (!isFinite(n)) n = DEFAULT_BG_POS;
+    n = Math.min(100, Math.max(0, Math.round(n)));
+    document.documentElement.style.setProperty('--bg-pos-y', n + '%');
+    if (el.posInput) el.posInput.value = String(n);
+    return n;
+  }
+
+  function setPhotoHint(text, isError) {
+    if (!el.photoHint) return;
+    el.photoHint.textContent = text;
+    el.photoHint.classList.toggle('is-error', !!isError);
   }
 
   // ---------------------------------------------------------------
@@ -431,10 +612,57 @@
     if (el.settings) el.settings.open = false;
   });
 
+  // Choosing a photo applies it immediately - waiting for Save would mean
+  // picking a background without being able to see it first.
+  el.photoInput.addEventListener('change', function () {
+    var file = el.photoInput.files && el.photoInput.files[0];
+    if (!file) return;
+
+    setPhotoHint('Processing photo…', false);
+
+    preparePhoto(file).then(function (blob) {
+      applyPhoto(blob);
+      return saveStoredPhoto(blob).then(function (ok) {
+        var size = Math.round(blob.size / 1024);
+        setPhotoHint(ok === null
+          ? 'Photo applied, but it could not be saved on this device, so it will not survive a reload.'
+          : 'Photo saved on this device (' + size + ' KB). Use the position slider if the subject sits behind the panels.',
+          ok === null);
+      });
+    }).catch(function (err) {
+      setPhotoHint(err && err.message ? err.message : 'That photo could not be used.', true);
+    }).then(function () {
+      // Clear the input so re-picking the same file fires `change` again.
+      el.photoInput.value = '';
+    });
+  });
+
+  el.posInput.addEventListener('input', function () {
+    var n = applyPhotoPosition(el.posInput.value);
+    storageSet(KEY_BG_POS, String(n));
+  });
+
+  el.photoReset.addEventListener('click', function () {
+    applyPhoto(null);
+    el.photoInput.value = '';
+    clearStoredPhoto().then(function () {
+      setPhotoHint('Using the photo the app ships with.', false);
+    });
+  });
+
   el.resetBtn.addEventListener('click', function () {
     storageRemove(KEY_TARGET);
     storageRemove(KEY_TITLE);
+    storageRemove(KEY_BG_POS);
     el.error.hidden = true;
+
+    // "Reset all" means the photo and its framing too.
+    applyPhoto(null);
+    el.photoInput.value = '';
+    applyPhotoPosition(DEFAULT_BG_POS);
+    clearStoredPhoto();
+    setPhotoHint('Stored on this device only. Applied straight away.', false);
+
     applyTarget(defaultTarget(), DEFAULT_TITLE);
   });
 
@@ -494,6 +722,21 @@
 
     applyTarget(storedTarget || defaultTarget(), storedTitle);
     updateOnlineBadge();
+
+    // Framing is applied synchronously so the layout does not shift once
+    // the photo arrives.
+    var storedPos = storageGet(KEY_BG_POS);
+    applyPhotoPosition(storedPos === null ? DEFAULT_BG_POS : storedPos);
+
+    // The photo itself loads asynchronously. Until it resolves, the CSS
+    // fallback (the shipped photo) is already on screen, so there is no
+    // blank frame while IndexedDB is read.
+    loadStoredPhoto().then(function (blob) {
+      if (blob) {
+        applyPhoto(blob);
+        setPhotoHint('Using your photo. Choose another to replace it.', false);
+      }
+    });
   }
 
   init();

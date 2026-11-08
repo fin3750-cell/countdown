@@ -76,11 +76,14 @@ body::after {
 
 body::before {
   z-index: -2;
-  background-image: url("./img/background.jpg");
+  /* Both of these are custom properties so the app can swap in a photo the
+     user picked, and move it vertically, without rewriting any rule. The
+     fallbacks here are the shipped photo and its default framing. */
+  background-image: var(--bg-image, url("./img/background.jpg"));
   background-size: cover;
   /* Bias towards the top of the photo so the face stays in frame on the
      wide, short viewports where `cover` has to crop vertically. */
-  background-position: 50% 18%;
+  background-position: 50% var(--bg-pos-y, 18%);
   background-repeat: no-repeat;
 }
 
@@ -259,6 +262,38 @@ body::after {
   color: var(--fg-dim);
 }
 
+/* The file picker: the native button is styled per-platform and cannot be
+   restyled directly, so only the surrounding control is themed. */
+input[type="file"] {
+  font: inherit;
+  font-size: .9rem;
+  color: var(--fg-dim);
+  background: #0d1428;
+  border: 1px solid #2d3a63;
+  border-radius: 10px;
+  padding: .6rem .7rem;
+  width: 100%;
+}
+
+input[type="file"]::file-selector-button {
+  font: inherit;
+  font-weight: 600;
+  color: #04121f;
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  padding: .45rem .9rem;
+  margin-right: .7rem;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  /* 44px row keeps the thumb an easy touch target. */
+  height: 44px;
+}
+
 input[type="text"],
 input[type="datetime-local"] {
   font: inherit;
@@ -287,6 +322,8 @@ summary:focus-visible,
   font-size: .8rem;
   color: var(--fg-dim);
 }
+
+.hint.is-error { color: var(--danger); }
 
 .error {
   margin: 0;

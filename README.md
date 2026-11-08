@@ -92,6 +92,39 @@ Open **Set target**, give the countdown a name and pick a date and time, and
 press Save. Both are stored in `localStorage` on the device. **Reset**
 restores the default target.
 
+### Using your own background photo
+
+**Set target → Background photo → Choose File.** The photo applies
+immediately and is kept on that device, so the app can be repointed at any
+countdown without touching the code.
+
+A few things happen to the photo on the way in:
+
+- **It is resized** to 1400px on its longest side and re-encoded as JPEG.
+  A phone camera produces 3000px+ images of several megabytes, which a
+  full-screen background has no use for.
+- **The format is normalised.** An iPhone may hand over a HEIC file, which
+  Safari can decode but other browsers cannot. Passing it through a canvas
+  turns it into a JPEG everything understands.
+- **EXIF metadata is stripped**, including any GPS coordinates the photo
+  was carrying, since the canvas re-encode keeps only pixels.
+
+It is stored in **IndexedDB**, not `localStorage`. `localStorage` holds
+only strings, so an image would have to be base64-encoded — inflating it by
+about a third and then having to fit a quota of roughly 5MB for the whole
+origin. IndexedDB keeps the Blob as binary with a far larger quota.
+
+**Photo position** slides the photo up and down behind the panels. Any
+photo whose subject sits mid-frame will otherwise end up behind the
+countdown, which is what this is for.
+
+**Default photo** goes back to the shipped image. **Reset all** clears the
+target, the name, the photo and its position together.
+
+Nothing here is uploaded anywhere. The photo never leaves the device, and
+is not in the repository — which also means it does not sync between your
+phone and your laptop.
+
 ### The default target
 
 The default, used on a first visit and restored by **Reset**, is

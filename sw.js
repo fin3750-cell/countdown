@@ -22,7 +22,7 @@
 
 'use strict';
 
-var CACHE_VERSION = 'v6';
+var CACHE_VERSION = 'v7';
 var CACHE_NAME = 'countdown-' + CACHE_VERSION;
 
 /* Relative URLs here resolve against the service worker's own location,

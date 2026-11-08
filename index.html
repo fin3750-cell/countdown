@@ -86,9 +86,31 @@
 
       <p id="error" class="error" role="alert" hidden></p>
 
+      <!-- Background photo. These two controls apply immediately rather
+           than on Save, because their effect is visual - you want to see
+           the photo land before committing to it. -->
+      <div class="field">
+        <label for="photo-input">Background photo</label>
+        <input id="photo-input" name="photo" type="file"
+               accept="image/*" autocomplete="off">
+        <p class="hint" id="photo-hint">
+          Stored on this device only. Applied straight away.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="pos-input">Photo position</label>
+        <input id="pos-input" type="range" min="0" max="100" step="1" value="18">
+        <p class="hint">
+          Slide to move the photo up or down so the subject sits clear of
+          the panels.
+        </p>
+      </div>
+
       <div class="actions">
         <button type="submit" class="btn btn-primary">Save</button>
-        <button type="button" id="reset" class="btn">Reset</button>
+        <button type="button" id="photo-reset" class="btn">Default photo</button>
+        <button type="button" id="reset" class="btn">Reset all</button>
       </div>
     </form>
   </details>
