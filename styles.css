@@ -14,9 +14,10 @@
   --danger:    #fb7185;
   --radius:    16px;
 
-  /* Fluid type: scales with the viewport but stays within sane bounds,
-     so the digits stay huge on a phone without overflowing. */
-  --digit-size: clamp(2.75rem, 17vw, 7rem);
+  /* Fluid type: scales with the viewport but stays within sane bounds.
+     Sized for FOUR columns (days / hours / minutes / seconds) - this was
+     17vw when there were three, and four at that size overflow a phone. */
+  --digit-size: clamp(1.6rem, 12vw, 4.25rem);
 }
 
 * { box-sizing: border-box; }
@@ -154,7 +155,7 @@ body::after {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: clamp(.15rem, 1.5vw, .75rem);
+  gap: clamp(.1rem, 1vw, .5rem);
 }
 
 .unit {
@@ -179,11 +180,14 @@ body::after {
 }
 
 .label {
-  margin-top: .5rem;
-  font-size: clamp(.65rem, 2.4vw, .8rem);
+  margin-top: .45rem;
+  font-size: clamp(.5rem, 1.9vw, .72rem);
   text-transform: uppercase;
-  letter-spacing: .14em;
+  /* Tighter tracking than before: "SECONDS" is the longest label and has
+     to sit inside a quarter-width column. */
+  letter-spacing: .06em;
   color: var(--fg-dim);
+  white-space: nowrap;
 }
 
 /* The thin divider between unit columns. */

@@ -26,9 +26,10 @@
   // Constants
   // ---------------------------------------------------------------
 
-  var MS_PER_MINUTE = 60 * 1000;
-  var MINUTES_PER_HOUR = 60;
-  var MINUTES_PER_DAY = 24 * 60;
+  var MS_PER_SECOND = 1000;
+  var SECONDS_PER_MINUTE = 60;
+  var SECONDS_PER_HOUR = 60 * 60;
+  var SECONDS_PER_DAY = 24 * 60 * 60;
 
   // Versioned storage keys, so a future format change can't be fed stale data.
   var KEY_TARGET = 'countdown.target.v1';   // value: "YYYY-MM-DDTHH:MM"
@@ -43,6 +44,7 @@
     days:        document.getElementById('days'),
     hours:       document.getElementById('hours'),
     minutes:     document.getElementById('minutes'),
+    seconds:     document.getElementById('seconds'),
     digits:      document.getElementById('digits'),
     readout:     document.getElementById('a11y-readout'),
     reached:     document.getElementById('reached'),
@@ -64,8 +66,9 @@
   // State
   // ---------------------------------------------------------------
 
-  var targetDate = null;   // a Date object: the fixed instant we count to
-  var timerId = null;      // handle for the pending setTimeout
+  var targetDate = null;       // a Date object: the fixed instant we count to
+  var timerId = null;          // handle for the pending setTimeout
+  var lastAnnouncement = null; // last text written to the live region
 
   // ---------------------------------------------------------------
   // localStorage helpers
@@ -238,18 +241,22 @@
     var remainingMs = targetMs - nowMs;
 
     if (remainingMs <= 0) {
-      return { done: true, days: 0, hours: 0, minutes: 0, remainingMs: remainingMs };
+      return {
+        done: true, days: 0, hours: 0, minutes: 0, seconds: 0,
+        remainingMs: remainingMs
+      };
     }
 
-    // floor() gives "whole minutes still to run", the usual countdown
-    // convention: it reads 0 minutes during the final 59 seconds.
-    var totalMinutes = Math.floor(remainingMs / MS_PER_MINUTE);
+    // floor() gives "whole seconds still to run", the usual countdown
+    // convention: it reads 0 seconds during the final fraction of a second.
+    var totalSeconds = Math.floor(remainingMs / MS_PER_SECOND);
 
     return {
       done: false,
-      days: Math.floor(totalMinutes / MINUTES_PER_DAY),
-      hours: Math.floor((totalMinutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR),
-      minutes: totalMinutes % MINUTES_PER_HOUR,
+      days: Math.floor(totalSeconds / SECONDS_PER_DAY),
+      hours: Math.floor((totalSeconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR),
+      minutes: Math.floor((totalSeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE),
+      seconds: totalSeconds % SECONDS_PER_MINUTE,
       remainingMs: remainingMs
     };
   }
@@ -277,15 +284,35 @@
     el.days.textContent = String(parts.days);
     el.hours.textContent = pad2(parts.hours);
     el.minutes.textContent = pad2(parts.minutes);
+    el.seconds.textContent = pad2(parts.seconds);
 
     if (parts.done) {
       el.clock.classList.add('is-done');
       el.reached.hidden = false;
-      el.readout.textContent = 'The target date and time has arrived.';
+      announce('The target date and time has arrived.');
     } else {
       el.clock.classList.remove('is-done');
       el.reached.hidden = true;
-      el.readout.textContent = describe(parts);
+      // Deliberately announced to minute precision, not second precision -
+      // see announce().
+      announce(describe(parts));
+    }
+  }
+
+  /**
+   * Update the screen-reader live region only when the text actually
+   * changes.
+   *
+   * This matters now that the display ticks every second. A polite live
+   * region that changes every second would make a screen reader talk
+   * continuously and bury everything else on the page. describe() reports
+   * only days, hours and minutes, so this writes at most once a minute
+   * even though the visible seconds keep moving.
+   */
+  function announce(text) {
+    if (text !== lastAnnouncement) {
+      lastAnnouncement = text;
+      el.readout.textContent = text;
     }
   }
 
@@ -294,14 +321,20 @@
   // ---------------------------------------------------------------
 
   /**
-   * Schedule the next render for the exact moment the minute digit changes.
+   * Schedule the next render for the exact moment the seconds digit changes.
    *
-   * The displayed minute count is floor(remaining / 60000), so it changes
-   * when `remaining` crosses a multiple of 60000. `remaining % 60000` is
-   * precisely how long that is away. Sleeping for just that long means we
-   * wake once a minute rather than once a second, and - because the delay is
-   * recomputed from the clock after every render - the schedule re-centres
-   * itself instead of accumulating drift.
+   * The displayed second count is floor(remaining / 1000), so it changes
+   * when `remaining` crosses a multiple of 1000, and `remaining % 1000` is
+   * precisely how long that is away. Scheduling to the boundary rather than
+   * calling setInterval(1000) keeps the digit flipping in step with the
+   * real clock: the delay is recomputed after every render, so the schedule
+   * re-centres itself instead of accumulating drift.
+   *
+   * Nothing is scheduled while the page is hidden. A backgrounded tab is
+   * throttled by the browser anyway, and the value would be stale the
+   * moment it came back - so instead the work stops entirely and
+   * visibilitychange re-renders from the clock on return. That is both
+   * cheaper on battery and more correct.
    */
   function scheduleNext() {
     if (timerId !== null) {
@@ -309,18 +342,19 @@
       timerId = null;
     }
     if (!targetDate) return;
+    if (document.hidden) return;
 
     var remainingMs = targetDate.getTime() - Date.now();
 
     // Target reached: nothing left to animate, so stop scheduling entirely.
     if (remainingMs <= 0) return;
 
-    var untilNextChange = remainingMs % MS_PER_MINUTE;
-    if (untilNextChange === 0) untilNextChange = MS_PER_MINUTE;
+    var untilNextChange = remainingMs % MS_PER_SECOND;
+    if (untilNextChange === 0) untilNextChange = MS_PER_SECOND;
 
-    // +250ms so we land just after the boundary rather than a hair before it
-    // and re-render the same value twice.
-    timerId = setTimeout(tick, untilNextChange + 250);
+    // +25ms so we land just after the boundary rather than a hair before it
+    // and render the same value twice.
+    timerId = setTimeout(tick, untilNextChange + 25);
   }
 
   /** Render, then arm the next render. The only scheduling entry point. */
@@ -336,8 +370,14 @@
   function applyTarget(date, titleText) {
     targetDate = date;
 
+    // The heading is optional. With no name set, it is removed from view
+    // but kept in the accessibility tree: the <section> is labelled by it
+    // via aria-labelledby, and hiding it outright would leave that panel
+    // unnamed for screen readers. `visually-hidden` keeps the label while
+    // giving the photo back the space.
     var name = (titleText || '').trim();
     el.title.textContent = name || 'Countdown';
+    el.title.classList.toggle('visually-hidden', name === '');
     document.title = name ? name + ' - Countdown' : 'Countdown';
 
     // Just the formatted date here. The abbreviation it already carries
@@ -398,7 +438,15 @@
   // timers while the screen was off, the first thing we do on return is read
   // the clock and re-arm.
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) tick();
+    if (document.hidden) {
+      // Stop the per-second timer while the app is out of sight.
+      if (timerId !== null) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
+    } else {
+      tick();
+    }
   });
 
   // Belt and braces: different platforms fire different events on resume.
