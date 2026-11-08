@@ -35,6 +35,12 @@
   var KEY_TARGET = 'countdown.target.v1';   // value: "YYYY-MM-DDTHH:MM"
   var KEY_TITLE = 'countdown.title.v1';     // value: free text
 
+  // Shown when nothing has been saved on this device yet, and restored by
+  // Reset. An empty name is still allowed: clearing the field and saving
+  // stores an empty string, which is kept, so "no heading" is a choice the
+  // app remembers rather than something this default overrides on reload.
+  var DEFAULT_TITLE = 'Elder Wells';
+
   // ---------------------------------------------------------------
   // Element references
   // ---------------------------------------------------------------
@@ -414,11 +420,10 @@
     var titleText = el.titleInput.value;
 
     storageSet(KEY_TARGET, toInputValue(parsed));
-    if (titleText.trim()) {
-      storageSet(KEY_TITLE, titleText.trim());
-    } else {
-      storageRemove(KEY_TITLE);
-    }
+    // Stored even when empty. Removing the key instead would mean a
+    // deliberately blank heading came back as DEFAULT_TITLE on the next
+    // load, which would read as the app ignoring the user.
+    storageSet(KEY_TITLE, titleText.trim());
 
     applyTarget(parsed, titleText);
 
@@ -430,7 +435,7 @@
     storageRemove(KEY_TARGET);
     storageRemove(KEY_TITLE);
     el.error.hidden = true;
-    applyTarget(defaultTarget(), '');
+    applyTarget(defaultTarget(), DEFAULT_TITLE);
   });
 
   // Recompute the moment the app becomes visible again. This is the handler
@@ -481,7 +486,11 @@
       : 'Interpreted in your device’s local time zone.';
 
     var storedTarget = parseLocalDateTime(storageGet(KEY_TARGET));
-    var storedTitle = storageGet(KEY_TITLE) || '';
+
+    // null means "never saved on this device" -> use the default.
+    // "" means "saved deliberately blank" -> respect it.
+    var storedTitle = storageGet(KEY_TITLE);
+    if (storedTitle === null) storedTitle = DEFAULT_TITLE;
 
     applyTarget(storedTarget || defaultTarget(), storedTitle);
     updateOnlineBadge();
