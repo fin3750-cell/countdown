@@ -90,5 +90,30 @@ mid-session.
 
 Open **Set target**, give the countdown a name and pick a date and time, and
 press Save. Both are stored in `localStorage` on the device. **Reset**
-restores the placeholder target, which is the next 1 January at midnight
-local time.
+restores the default target.
+
+### The default target
+
+The default, used on a first visit and restored by **Reset**, is
+**17 December 2026 at 2:44 PM MST**.
+
+It is anchored in `defaultTarget()` in `app.js` as a fixed *instant* —
+`Date.UTC(2026, 11, 17, 21, 44)` — rather than as a local wall-clock time.
+MST is UTC−7 and December falls outside daylight saving across the Mountain
+zone (Denver is on MST in winter, Arizona is on MST year-round), so 2:44 PM
+MST is unambiguously 21:44 UTC.
+
+Anchoring the instant means the countdown ends at the same real moment
+wherever it is opened, while still being *displayed* in the viewer's own
+zone: a Mountain-time device reads it back as 2:44 PM MST, and a viewer in
+New York sees the same instant written as 4:44 PM EST.
+
+If you would rather the default meant "2:44 PM in whatever zone the device
+happens to be in", make it a local construction instead:
+
+```js
+return new Date(2026, 11, 17, 14, 44, 0, 0);
+```
+
+Unlike the previous rolling default, this is a fixed date: once it passes,
+the app shows the "arrived" state until a new target is set.

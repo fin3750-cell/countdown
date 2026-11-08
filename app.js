@@ -198,13 +198,26 @@
   // ---------------------------------------------------------------
 
   /**
-   * The placeholder target used on a first visit: the next 1 January at
-   * 00:00 local time. It is always in the future and needs no explanation,
-   * and the user is expected to replace it in the Set target panel.
+   * The target used on a first visit, and restored by the Reset button:
+   *
+   *     17 December 2026, 2:44 PM MST
+   *
+   * This is anchored as a fixed INSTANT, not as a local wall-clock time.
+   * Mountain Standard Time is UTC-7, and December is outside daylight
+   * saving everywhere in the Mountain zone (Denver is on MST in winter;
+   * Arizona is on MST all year), so 2:44 PM MST is unambiguously 21:44 UTC.
+   *
+   * Anchoring the instant rather than the wall-clock reading means the
+   * countdown ends at the same real moment wherever it is opened. The
+   * display still renders in the viewer's own zone, so on a Mountain-time
+   * device this reads back as 2:44 PM MST, while a viewer in New York sees
+   * the same instant written as 4:44 PM EST.
+   *
+   * Note that this is a fixed date rather than a rolling one: once it
+   * passes, the app shows the "arrived" state until a new target is set.
    */
   function defaultTarget() {
-    var now = new Date();
-    return new Date(now.getFullYear() + 1, 0, 1, 0, 0, 0, 0);
+    return new Date(Date.UTC(2026, 11, 17, 21, 44, 0, 0));
   }
 
   // ---------------------------------------------------------------
