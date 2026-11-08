@@ -28,20 +28,71 @@ html, body {
 }
 
 body {
-  background:
-    radial-gradient(1200px 800px at 50% -10%, #1b2448 0%, transparent 60%),
-    var(--bg);
+  /* Base colour shows through before the photo loads, and behind it if the
+     photo is ever missing, so text is never light-on-light. */
+  background: var(--bg);
   color: var(--fg);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   display: flex;
   justify-content: center;
+  /* `dvh` tracks the real viewport on mobile, where browser chrome changes
+     height as you scroll; `vh` is the fallback for older engines. */
+  min-height: 100vh;
+  min-height: 100dvh;
   /* Respect notches / home indicator when installed full-screen. */
   padding: max(1.25rem, env(safe-area-inset-top))
            max(1rem, env(safe-area-inset-right))
            max(1.25rem, env(safe-area-inset-bottom))
            max(1rem, env(safe-area-inset-left));
+}
+
+/* ---------------- background photo ----------------
+
+   Two fixed layers sit behind everything:
+
+     body::before  the photo
+     body::after   a dark scrim that fades in towards the bottom
+
+   They are `position: fixed` rather than `background-attachment: fixed`,
+   which is unreliable on iOS Safari - it commonly jumps or renders at the
+   wrong scale while scrolling.
+
+   The scrim is what makes the text legible. The photo is light and busy
+   in places, and white text straight onto it would be unreadable; the
+   gradient stays clear over the top of the frame (where the face is) and
+   deepens towards the bottom, where the countdown sits.
+   -------------------------------------------------- */
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body::before {
+  z-index: -2;
+  background-image: url("./img/background.jpg");
+  background-size: cover;
+  /* Bias towards the top of the photo so the face stays in frame on the
+     wide, short viewports where `cover` has to crop vertically. */
+  background-position: 50% 18%;
+  background-repeat: no-repeat;
+}
+
+body::after {
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 16, 32, 0.25) 0%,
+    rgba(11, 16, 32, 0.15) 28%,
+    rgba(11, 16, 32, 0.70) 55%,
+    rgba(11, 16, 32, 0.94) 78%,
+    rgba(11, 16, 32, 0.98) 100%
+  );
 }
 
 .wrap {
@@ -50,11 +101,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  /* Push the content into the lower, darker half of the frame so it never
+     sits across the face. The height comes from body stretching this to
+     full viewport height, rather than a min-height here, which would add
+     to the body padding and create a spurious scrollbar. */
+  justify-content: flex-end;
+  padding-bottom: 0.5rem;
 }
 
 /* ---------------- header ---------------- */
 
-.head { text-align: center; }
+/* Sits at the top of the frosted panel, above the digits. */
+.head {
+  text-align: center;
+  margin-bottom: clamp(.75rem, 3vw, 1.25rem);
+}
 
 .event-title {
   margin: 0 0 .35rem;
@@ -62,23 +123,31 @@ body {
   font-weight: 650;
   letter-spacing: -0.01em;
   overflow-wrap: break-word;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
 }
 
 .target-line {
   margin: 0;
-  color: var(--fg-dim);
+  color: #c3cde8;
   font-size: .95rem;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 10px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9);
 }
 
 /* ---------------- the clock ---------------- */
 
+/* Frosted panel: translucent so the photo reads through it, blurred so the
+   digits still have a calm surface to sit on. `backdrop-filter` is
+   unsupported in a few engines, hence the solid-ish rgba fallback colour
+   underneath, which stays legible on its own. */
 .clock {
-  background: linear-gradient(180deg, var(--bg-card), #111730);
-  border: 1px solid #263257;
+  background: rgba(16, 23, 46, 0.52);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+  border: 1px solid rgba(160, 180, 230, 0.18);
   border-radius: var(--radius);
   padding: clamp(1rem, 4vw, 2rem) clamp(.5rem, 3vw, 1.5rem);
-  box-shadow: 0 18px 50px -20px rgba(0,0,0,.8);
+  box-shadow: 0 18px 50px -20px rgba(0,0,0,.85);
 }
 
 .digits {
@@ -143,8 +212,10 @@ body {
 /* ---------------- settings ---------------- */
 
 .settings {
-  background: var(--bg-card);
-  border: 1px solid #263257;
+  background: rgba(16, 23, 46, 0.52);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+  border: 1px solid rgba(160, 180, 230, 0.18);
   border-radius: var(--radius);
   padding: .25rem .9rem;
 }

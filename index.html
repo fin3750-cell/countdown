@@ -25,15 +25,18 @@
 
 <main class="wrap">
 
-  <header class="head">
-    <h1 id="event-title" class="event-title">Countdown</h1>
-    <p id="target-line" class="target-line">&nbsp;</p>
-  </header>
-
   <!-- The live region announces the remaining time to screen readers.
        aria-live="polite" + the units spelled out in #a11y-readout keeps it
-       intelligible, while the big visual digits stay aria-hidden. -->
+       intelligible, while the big visual digits stay aria-hidden.
+
+       The heading lives inside this panel rather than floating above it so
+       that no text is ever laid over the background photo's subject. -->
   <section class="clock" aria-labelledby="event-title">
+
+    <header class="head">
+      <h1 id="event-title" class="event-title">Countdown</h1>
+      <p id="target-line" class="target-line">&nbsp;</p>
+    </header>
 
     <div id="digits" class="digits" aria-hidden="true">
       <div class="unit">

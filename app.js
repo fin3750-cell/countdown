@@ -340,9 +340,11 @@
     el.title.textContent = name || 'Countdown';
     document.title = name ? name + ' - Countdown' : 'Countdown';
 
-    var zone = localZoneName();
-    el.targetLine.textContent = formatTargetForDisplay(date) +
-      (zone ? ' · ' + zone : '');
+    // Just the formatted date here. The abbreviation it already carries
+    // ("MST", "EST") names the zone, so appending the full IANA name made
+    // the line wrap onto two rows for no new information - and the full
+    // name is still shown in the Set target panel's hint.
+    el.targetLine.textContent = formatTargetForDisplay(date);
 
     el.targetInput.value = toInputValue(date);
     el.titleInput.value = name;

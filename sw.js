@@ -22,7 +22,7 @@
 
 'use strict';
 
-var CACHE_VERSION = 'v2';
+var CACHE_VERSION = 'v3';
 var CACHE_NAME = 'countdown-' + CACHE_VERSION;
 
 /* Relative URLs here resolve against the service worker's own location,
@@ -37,7 +37,8 @@ var PRECACHE_URLS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './img/background.jpg'
 ];
 
 /* ------------------------------------------------------------------
