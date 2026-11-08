@@ -59,6 +59,48 @@ render and again on resume. The widget uses the same clock-derived
 calculation, so whenever iOS *does* refresh it, the value drawn is correct
 for that moment.
 
+## Adjusting the Lock Screen font sizes
+
+All Lock Screen sizes live in one block near the top of
+`countdown-widget.js`:
+
+```js
+const LOCK = {
+  circularNumber: 24,   // the big day count in the circular widget
+  circularLabel: 9,     // the word "days" beneath it
+  rectTitle: 11,        // the widget name, top line
+  rectValue: 20,        // the hero line, e.g. "39d 2h"
+  rectDate: 10          // the target date, bottom line
+};
+```
+
+Change a number, save, and the widget picks it up on its next refresh
+(or long-press → Edit Widget → reselect the script to force it sooner).
+
+The Lock Screen is tight. Plan for roughly:
+
+| Family | Outer size | Usable area |
+| --- | --- | --- |
+| `accessoryCircular` | ~72pt across | ~50 × 50pt (the inscribed square) |
+| `accessoryRectangular` | ~160 × 72pt | ~152 × 64pt after padding |
+
+At the defaults above the rectangular stack needs about 53pt of the 64pt
+available and the circular about 40pt of 50pt, so there is room to go
+larger if you want — but not much.
+
+Three things are deliberate and worth leaving alone:
+
+- **Every accessory text sets `minimumScaleFactor`.** Text that does not
+  fit shrinks instead of truncating, so a three-digit day count degrades
+  to smaller digits rather than `36…`.
+- **No text colour is set on the Lock Screen.** iOS applies its own
+  vibrant monochrome treatment to accessory widgets and ignores custom
+  colours, so setting them achieves nothing and can hurt legibility on
+  some wallpapers. Colour is only used on the Home Screen.
+- **The inline widget sets no font at all.** iOS renders inline widgets
+  in the system font beside the clock and overrides anything set here.
+  Only the text is ours, so keep it short or it will be truncated.
+
 ## Retargeting
 
 Edit the two configuration lines near the top of `countdown-widget.js`:

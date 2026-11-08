@@ -57,6 +57,27 @@ const TARGET = new Date(Date.UTC(2026, 11, 17, 21, 44, 0, 0));
 const TITLE = 'Countdown';
 const APP_URL = 'https://fin3750-cell.github.io/countdown/';
 
+// ------------------------------------------------------------------
+// Lock Screen font sizes, in points. Tune these if the text looks wrong
+// on your device - they are the only numbers you should need to touch.
+//
+// The Lock Screen gives a widget very little room:
+//   circular     roughly 72pt across, but only the inscribed square is
+//                usable, so plan for about 50pt of width and height
+//   rectangular  roughly 160 x 72pt, about 152 x 64pt after padding
+//
+// Every accessory text below also sets minimumScaleFactor, so if a value
+// is wider than its box the system shrinks it instead of truncating it.
+// A three-digit day count will shrink rather than turn into "36...".
+// ------------------------------------------------------------------
+const LOCK = {
+  circularNumber: 24,   // the big day count in the circular widget
+  circularLabel: 9,     // the word "days" beneath it
+  rectTitle: 11,        // the widget name, top line
+  rectValue: 20,        // the hero line, e.g. "39d 2h"
+  rectDate: 10          // the target date, bottom line
+};
+
 // Palette, matched to the web app.
 const BG_TOP = new Color('#18234c');
 const BG_BOTTOM = new Color('#0b1020');
@@ -98,6 +119,39 @@ function targetText() {
   const df = new DateFormatter();
   df.dateFormat = 'EEE d MMM, h:mm a';
   return df.string(TARGET);
+}
+
+/**
+ * A shorter form for the Lock Screen, which has far less width than a
+ * Home Screen widget. Drops the weekday: "17 Dec, 2:44 PM".
+ */
+function targetTextShort() {
+  const df = new DateFormatter();
+  df.dateFormat = 'd MMM, h:mm a';
+  return df.string(TARGET);
+}
+
+/**
+ * Lock Screen text helper.
+ *
+ * Two things matter here and are easy to get wrong:
+ *
+ *  - minimumScaleFactor lets the system shrink text that does not fit
+ *    rather than clipping it, which is what stops a long value turning
+ *    into an ellipsis in a 50pt-wide circle.
+ *  - No text colour is set anywhere in the accessory widgets. iOS renders
+ *    Lock Screen widgets with its own vibrant monochrome treatment and
+ *    ignores custom colours, so setting them achieves nothing and can
+ *    make the result less legible on some wallpapers.
+ */
+function lockText(container, string, size, opts) {
+  const o = opts || {};
+  const t = container.addText(string);
+  t.font = o.bold ? Font.boldSystemFont(size) : Font.systemFont(size);
+  t.lineLimit = 1;
+  t.minimumScaleFactor = o.scale || 0.5;
+  if (o.center) t.centerAlignText();
+  return t;
 }
 
 // ------------------------------------------------------------------
@@ -162,41 +216,50 @@ function buildAccessory(family) {
   w.addAccessoryWidgetBackground = true;
 
   if (family === 'accessoryInline') {
-    // Inline widgets are a single line of text, styled by the system.
+    // Inline widgets are one line rendered in the system's own font next
+    // to the clock. iOS overrides any font set here, so none is set -
+    // only the text is ours. Keep it short or iOS will truncate it.
     w.addText(TITLE + ' ' + shortText(parts));
     return w;
   }
 
   if (family === 'accessoryCircular') {
-    w.setPadding(2, 2, 2, 2);
+    // No padding: the circle's usable area is already only the inscribed
+    // square, so every point of inset is one we cannot spare.
+    w.setPadding(0, 0, 0, 0);
+
     const stack = w.addStack();
     stack.layoutVertically();
+    stack.centerAlignContent();
     stack.addSpacer();
 
-    const n = stack.addText(parts.done ? '0' : String(parts.days));
-    n.font = Font.boldSystemFont(20);
-    n.centerAlignText();
+    // Scales hard (0.3) because a three-digit day count has to fit the
+    // same box as a one-digit one.
+    lockText(stack, parts.done ? '0' : String(parts.days),
+      LOCK.circularNumber, { bold: true, center: true, scale: 0.3 });
 
-    const l = stack.addText(parts.done ? 'now' : 'days');
-    l.font = Font.systemFont(9);
-    l.centerAlignText();
+    lockText(stack, parts.done ? 'now' : (parts.days === 1 ? 'day' : 'days'),
+      LOCK.circularLabel, { center: true, scale: 0.6 });
 
     stack.addSpacer();
     return w;
   }
 
-  // accessoryRectangular
-  const t = w.addText(TITLE);
-  t.font = Font.mediumSystemFont(12);
-  t.lineLimit = 1;
+  // accessoryRectangular: three lines in about 64pt of height, so the
+  // sizes have to add up to less than that with spacing included.
+  w.setPadding(0, 2, 0, 2);
+  w.addSpacer(1);
 
-  const v = w.addText(parts.done ? 'Arrived' : shortText(parts));
-  v.font = Font.boldSystemFont(18);
+  lockText(w, TITLE, LOCK.rectTitle, { scale: 0.7 });
 
-  const s = w.addText(targetText());
-  s.font = Font.systemFont(10);
-  s.lineLimit = 1;
+  lockText(w, parts.done ? 'Arrived' : shortText(parts),
+    LOCK.rectValue, { bold: true, scale: 0.4 });
 
+  // The short date form - the full one with the weekday does not fit the
+  // Lock Screen's width at a readable size.
+  lockText(w, targetTextShort(), LOCK.rectDate, { scale: 0.7 });
+
+  w.addSpacer(1);
   return w;
 }
 
