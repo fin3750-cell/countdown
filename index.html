@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Countdown</title>
+<meta name="description" content="An offline-capable countdown to a target date and time in your local time zone.">
+
+<!-- PWA wiring. All paths are RELATIVE ("./") so the app works from a
+     GitHub Pages subdirectory such as /countdown/ as well as from a domain root. -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0b1020">
+<link rel="icon" href="./icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+<!-- iOS standalone-mode hints: iOS reads these rather than manifest.json -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Countdown">
+
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<main class="wrap">
+
+  <header class="head">
+    <h1 id="event-title" class="event-title">Countdown</h1>
+    <p id="target-line" class="target-line">&nbsp;</p>
+  </header>
+
+  <!-- The live region announces the remaining time to screen readers.
+       aria-live="polite" + the units spelled out in #a11y-readout keeps it
+       intelligible, while the big visual digits stay aria-hidden. -->
+  <section class="clock" aria-labelledby="event-title">
+
+    <div id="digits" class="digits" aria-hidden="true">
+      <div class="unit">
+        <span id="days" class="value">--</span>
+        <span class="label">days</span>
+      </div>
+      <div class="sep" aria-hidden="true"></div>
+      <div class="unit">
+        <span id="hours" class="value">--</span>
+        <span class="label">hours</span>
+      </div>
+      <div class="sep" aria-hidden="true"></div>
+      <div class="unit">
+        <span id="minutes" class="value">--</span>
+        <span class="label">minutes</span>
+      </div>
+    </div>
+
+    <p id="a11y-readout" class="visually-hidden" aria-live="polite" role="status"></p>
+
+    <p id="reached" class="reached" hidden>The target date and time has arrived.</p>
+  </section>
+
+  <!-- Settings. <details> gives a disclosure panel with zero JavaScript. -->
+  <details class="settings">
+    <summary>Set target</summary>
+
+    <form id="form" class="form" novalidate>
+      <div class="field">
+        <label for="title-input">Event name</label>
+        <input id="title-input" name="title" type="text" maxlength="60"
+               autocomplete="off" placeholder="Countdown">
+      </div>
+
+      <div class="field">
+        <label for="target-input">Target date and time</label>
+        <!-- type="datetime-local" is deliberate: the value carries NO time zone,
+             so whatever the user picks is read as their own wall-clock time. -->
+        <input id="target-input" name="target" type="datetime-local" required>
+        <p class="hint" id="tz-hint"></p>
+      </div>
+
+      <p id="error" class="error" role="alert" hidden></p>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" id="reset" class="btn">Reset</button>
+      </div>
+    </form>
+  </details>
+
+  <footer class="foot">
+    <span id="offline-badge" class="badge" hidden>Offline &mdash; showing cached app</span>
+    <span id="update-badge" class="badge badge-update" hidden>
+      Update ready &mdash; <button type="button" id="reload-btn" class="linkbtn">reload</button>
+    </span>
+  </footer>
+
+</main>
+
+<script src="./app.js"></script>
+</body>
+</html>
